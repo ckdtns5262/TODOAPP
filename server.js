@@ -1,5 +1,6 @@
 // express 라이브러리 기본 셋팅
 const express = require('express');
+require('dotenv').config()
 const app = express();
 const bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({ extended: true }))
@@ -12,7 +13,7 @@ app.set('view engine', 'ejs')
 app.use('/public',express.static('public'))
 
 var db;
-MongoClient.connect('mongodb+srv://ckdgus5262:ckdgus12@cluster0.o7azh20.mongodb.net/?retryWrites=true&w=majority',
+MongoClient.connect(process.env.DB_URL,
     function (error, client) {
         var db  = client.db('todoapp')
         // 8080 port로 웹서버를 열고 잘 열리면 console 출력
@@ -36,8 +37,6 @@ MongoClient.connect('mongodb+srv://ckdgus5262:ckdgus12@cluster0.o7azh20.mongodb.
             })
         })
       
-
-
         app.listen(8080, function () {
             console.log('listening on 8080')
         });
@@ -76,7 +75,57 @@ MongoClient.connect('mongodb+srv://ckdgus5262:ckdgus12@cluster0.o7azh20.mongodb.
                 response.redirect('/list')
             })
         })
-        
+        app.get('/login', function(request, response){
+            response.render('login.ejs')
+        })
+        app.post('/login', passport.authenticate('local',{
+            failureRedirect : '/fail'
+        }),function(request, response){
+            response.redirect('/')
+        })
+        app.get('/fail', function(request, response){
+            response.render('fail.ejs')
+        })
+    
+        passport.use(new LocalStrategy({
+            usernameField: 'id',
+            passwordField: 'pw',
+            session: true,
+            passReqToCallback: false,
+          }, function (입력한아이디, 입력한비번, done) {
+            console.log(입력한아이디, 입력한비번);
+            db.collection('login').findOne({ id: 입력한아이디 }, function (에러, 결과) {
+              if (에러) return done(에러)
+              if (!결과) return done(null, false, { message: '존재하지않는 아이디요' })
+              if (입력한비번 == 결과.pw) {
+                return done(null, 결과)
+              } else {
+                return done(null, false, { message: '비번틀렸어요' })
+              }
+            })
+          }));
+          passport.serializeUser(function(user,done){
+            done(null, user.id)
+          })
+          passport.deserializeUser(function(아이디,done){
+            db.collection('login').findOne({id: 아이디}, function(err,res){
+                done(null, res)
+
+            })
+          })
+
+
+          app.get('/mypage', isLogin,function(request,response){
+            console.log(request.user)
+            response.render('mypage.ejs', {사용자 : request.user})
+        })
+        function isLogin(request,response, next){
+            if(request.user){
+                next()
+            } else {
+                response.send('로그인 안함')
+            }
+        }
     })
 
 app.get('/', function (request, response) {
@@ -86,5 +135,16 @@ app.get('/', function (request, response) {
 app.get('/write', function (request, response) {
     response.render('write.ejs')
 })
+
+
+const passport = require('passport')
+const LocalStrategy = require('passport-local').Strategy
+const session = require('express-session')
+
+
+// app.use(미들웨어) : 요청 - 응답 중간에 뭔가 실행되는 코드
+app.use(session({secret : '비밀코드', resave : true, saveUninitialized: false}))
+app.use(passport.initialize())
+app.use(passport.session())
 
 

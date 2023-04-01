@@ -27,7 +27,10 @@ MongoClient.connect(process.env.DB_URL,
                 console.log(result.totalPost)
                 var 총게시물갯수 = result.totalPost
 
-                db.collection('post').insertOne({ _id : (총게시물갯수+1), 제목: request.body.title, 날짜: request.body.date },function (error, result) {
+                var 저장할거 = { _id : (총게시물갯수+1), 제목: request.body.title, 날짜: request.body.date , 작성자 : request.user._id}
+
+                db.collection('post').insertOne(저장할거,
+                function (error, result) {
                     console.log('저장완료')
                 db.collection('counter').updateOne({name : '게시물갯수'},{ $inc:{totalPost : 1}},function(error, result){  // update operator $set => 바꿀값
                     if(error) return console.log(error)                                                                 // increment operator $inc => 기존값에 더해줄 값
@@ -36,6 +39,8 @@ MongoClient.connect(process.env.DB_URL,
                 
             })
         })
+
+
       
         app.listen(8080, function () {
             console.log('listening on 8080')
@@ -50,8 +55,9 @@ MongoClient.connect(process.env.DB_URL,
         })
         app.delete('/delete', function(request, response){
             request.body._id = parseInt(request.body._id)
-            db.collection('post').deleteOne(request.body, function(error, result){
+            db.collection('post').deleteOne({_id : request.body._id , 작성자 : request.user._id}, function(error, result){
               console.log('삭제완료')
+              
               response.status(200).send({ message : '성공했습니다'})
             })
             
@@ -113,7 +119,11 @@ MongoClient.connect(process.env.DB_URL,
 
             })
           })
-
+          app.post('/register', function(req, res){
+            db.collection('login').insertOne({id : req.body.id , pw : req.body.pw}, function(err, result){
+                res.redirect('/')
+            })
+          })
 
           app.get('/mypage', isLogin,function(request,response){
             console.log(request.user)
@@ -126,6 +136,27 @@ MongoClient.connect(process.env.DB_URL,
                 response.send('로그인 안함')
             }
         }
+        app.get('/search', (req, res)=>{
+            var 검색조건 = [
+                {
+                    $search : {
+                        index : 'titleSearch',
+                        text : {
+                            query : req.query.value,
+                            path : "제목" // 제목날짜 둘다 찾고 싶으면 ['제목', '날짜']
+                        }
+                    }
+                }, 
+                { $sort : {_id : -1}},
+                { $limit : 10 },
+               //  { $project : {제목 : 1, _id : 0, score : {$meta : "searchScore"}}}
+
+            ]
+            db.collection('post').aggregate(검색조건).toArray((err,result)=>{
+                console.log(result)
+                res.render('search.ejs', {posts : result})
+            })
+        }) 
     })
 
 app.get('/', function (request, response) {
@@ -146,5 +177,6 @@ const session = require('express-session')
 app.use(session({secret : '비밀코드', resave : true, saveUninitialized: false}))
 app.use(passport.initialize())
 app.use(passport.session())
+
 
 

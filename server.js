@@ -8,6 +8,7 @@ const MongoClient = require('mongodb').MongoClient;
 const methodOverride = require('method-override')
 app.use(methodOverride('_method'))
 app.set('view engine', 'ejs')
+const {ObjectId} = require('mongodb')
 
 // static 파일을 보관하기 위해 public 폴더를 쓸거다
 app.use('/public',express.static('public'))
@@ -39,7 +40,35 @@ MongoClient.connect(process.env.DB_URL,
                 
             })
         })
+        app.post('/message',isLogin, function(req, res){
+            var 채팅내용 = { 
+                parent : req.body.parent,
+                userid : req.user._id,
+                content : req.body.content,
+                date : new Date()
+                }
+            db.collection('message').insertOne(채팅내용)
+            .then((result)=>{
+                res.send(result)
+            }).catch(()=>{
 
+            })
+        })
+        // 여기로 get요청하면 실시간 채널이 오픈이 됨
+        app.get('/message/:id', isLogin, function(req, res){
+            res.writeHead(200,{
+                "Connection" : "keep-alive",
+                "Content-Type" : "text/event-stream",
+                "Cache-Control" : "no-cache"
+            });
+            db.collection('message').find({parent : req.params.id}).toArray()
+            .then((result)=>{
+            res.write('event: test\n')
+            res.write(`data: ${JSON.stringify(result)}\n\n`)
+
+            })
+
+        })
 
       
         app.listen(8080, function () {
@@ -136,6 +165,24 @@ MongoClient.connect(process.env.DB_URL,
                 response.send('로그인 안함')
             }
         }
+        app.post('/chatroom', isLogin, function(req, res){
+
+            var 채팅게시물 = {
+                title : '땡땡채팅방',
+                member : [ObjectId(req.body.당한사람id), req.user._id], 
+                date : new Date() 
+            }
+
+            db.collection('chatroom').insertOne(채팅게시물, 
+                function(err, res){
+                }
+            ).then((result)=>{
+                res.send('성공')
+            })
+        })
+
+
+
         app.get('/search', (req, res)=>{
             var 검색조건 = [
                 {
@@ -157,7 +204,53 @@ MongoClient.connect(process.env.DB_URL,
                 res.render('search.ejs', {posts : result})
             })
         }) 
+
+        app.get('/chat', isLogin, function(req, res){
+            db.collection('chatroom').find({member : req.user._id}).toArray().then((result)=>{
+                res.render('chat.ejs', {data : result})
+            })
+        })
+
+
     })
+
+
+
+app.get('/upload', function(req, res){
+    res.render('upload.ejs')
+})
+let multer = require('multer')
+var storage = multer.diskStorage({
+    destination : function(req, file, cb){
+        cb(null, './public/image')
+    }, 
+    filename : function(req,file, cb){
+        cb(null, file.originalname)
+    }
+})
+
+var upload = multer({
+    storage : storage,
+    fileFilter : function(req, file, callback){
+        var ext = path.extname(file.originalname);
+        if(ext !== '.png' && ext !== '.jpg' && ext !== '.jpeg'){
+            return callback(new Error('PNG, JPG만 업로드하세요'))
+        }
+        callback(null, true)
+    },
+    limits : {
+        fileSize : 1024 * 1024
+    }
+
+})
+
+app.post('/upload', upload.single('profile') , function(req, res){
+    res.send('업로드 완료')
+})
+
+app.get('/image/:imageName', function(req, res){
+    res.sendFile(__dirname + '/public/image/' + req.params.imageName)
+})
 
 app.get('/', function (request, response) {
     response.render('index.ejs')
@@ -167,13 +260,18 @@ app.get('/write', function (request, response) {
     response.render('write.ejs')
 })
 
+app.use('/shop', require('./routes/shop'))
+app.use('/board/sub', require('./routes/board'))
+
+
 
 const passport = require('passport')
 const LocalStrategy = require('passport-local').Strategy
-const session = require('express-session')
+const session = require('express-session');
+const { response } = require('express');
 
 
-// app.use(미들웨어) : 요청 - 응답 중간에 뭔가 실행되는 코드
+// app.use(미들웨어) : 요청 - 응답 중간에 뭔가 실행되는 코드 *미들웨어 : 요청과 응답 사이에 실행되는 코드
 app.use(session({secret : '비밀코드', resave : true, saveUninitialized: false}))
 app.use(passport.initialize())
 app.use(passport.session())

@@ -25,3 +25,9 @@ body {
   .mine {
     float: right;
   } 
+  .chat-box1 {
+    background: skyblue;
+    padding: 5px;
+    border-radius: 5px;
+    float : right
+  }

@@ -27,10 +27,10 @@
        <div class="col-9 p-0">
          <div class="chat-room">
             <ul class="list-group chat-content">
-              <li><span class="chat-box">채팅방1 내용</span></li>
-              <li><span class="chat-box">채팅방1 내용</span></li>
-              <li><span class="chat-box mine">채팅방1 내용</span></li>
+              <li><span class="chat-box"></span></li>
+              <li><span class="chat-box1"></span></li>
             </ul>
+           
           <div class="input-group">
             <input class="form-control" id="chat-input">
             <button class="btn btn-secondary chat" id="send">전송</button>
@@ -42,8 +42,6 @@
   </div> 
   <script src="https://code.jquery.com/jquery-3.4.1.min.js" ></script>
     <script>
-
-    
       
       $('#send').click(()=>{
 
@@ -62,12 +60,21 @@
       $('.list-group-item').click(function(){
         $(this).css('background-color', '#eee')
         누른채팅방id = $(this).attr('data-id')
+        $('.chat-content').html('') // 일단 메세지들 전부 비우기
 
-        eventSource = new EventSource('/message' + 누른채팅방id)
+        if(eventSource !== undefined){
+          eventSource.close()
+        }
+
+        eventSource = new EventSource('/message/' + 누른채팅방id)
         eventSource.addEventListener('test',function(e){
-          console.log(JSON.parse(e.data));
-          
-
+         var 가져온거 = (JSON.parse(e.data))
+         console.log(e.data.userid)
+         console.log(누른채팅방id)
+          가져온거.forEach(function(i){
+              $('.chat-content').append('<li><span class="chat-box">' + i.content+ '</span></li>')
+            
+          })
         })
       })
       

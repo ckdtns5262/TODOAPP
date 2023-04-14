@@ -11,7 +11,7 @@ app.set('view engine', 'ejs')
 const {ObjectId} = require('mongodb')
 
 // static 파일을 보관하기 위해 public 폴더를 쓸거다
-app.use('/public',express.static('public'))
+app.use('/public', express.static('public'))
 
 var db;
 MongoClient.connect(process.env.DB_URL,
@@ -64,12 +64,21 @@ MongoClient.connect(process.env.DB_URL,
             db.collection('message').find({parent : req.params.id}).toArray()
             .then((result)=>{
             res.write('event: test\n')
-            res.write(`data: ${JSON.stringify(result)}\n\n`)
-
+            res.write('data: ' + JSON.stringify(result) + '\n\n')
             })
 
+            const pipeline = [
+                { $match : { 'fullDocument.parent': req.params.id}}
+            ];
+            const collection = db.collection('message');
+            const changeStream = collection.watch(pipeline); // watch()를 붙이면 실시간 감시해줌
+            // 해당 컬렉션에 변동생기면 여기 코드 실행됨
+            changeStream.on('change', (result)=>{
+                res.write('event: test\n')
+                res.write('data: ' + JSON.stringify([result.fullDocument]) + '\n\n')
+            })
         })
-
+    
       
         app.listen(8080, function () {
             console.log('listening on 8080')
@@ -210,7 +219,6 @@ MongoClient.connect(process.env.DB_URL,
                 res.render('chat.ejs', {data : result})
             })
         })
-
 
     })
 

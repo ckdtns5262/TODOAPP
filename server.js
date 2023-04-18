@@ -2,6 +2,10 @@
 const express = require('express');
 require('dotenv').config()
 const app = express();
+const http = require('http').createServer(app);
+const {Server} = require('socket.io')
+const io = new Server(http);
+
 const bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({ extended: true }))
 const MongoClient = require('mongodb').MongoClient;
@@ -80,9 +84,35 @@ MongoClient.connect(process.env.DB_URL,
         })
     
       
-        app.listen(8080, function () {
+        http.listen(8080, function () {
             console.log('listening on 8080')
         });
+
+        app.get('/socket',function(req, res) {
+            res.render('socket.ejs')
+        })
+        // 누가 웹소켓 접속하면 내부 코드 실행해주세요
+        io.on('connection', function(socket){
+            console.log('유저 접속됨')
+            // 채팅방 만들고 입장
+            socket.on('joinroom',function(data){
+                socket.join('room1')
+            })
+
+            socket.on('room1-send',function(data){
+                io.to('room1').emit('broadcast',data)
+            })
+
+
+
+            socket.on('user-send',function(data){
+                console.log(data)
+                io.emit('broadcast', data) // 모든 유저에게 메세지 보내줌
+                io.to(socket.id).emit('broadcast', data) // to 특정유저에게만 보내줌
+            })
+
+        })
+        
 
         app.get('/list', function (request, response){
             // db에 저장된 post라는 collection 안의 모든 데이터 꺼내기
